@@ -3,158 +3,225 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- PWA 設定 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#f8f8f6">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f5f5f7">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%234f46e5' width='100' height='100' rx='22'/><text y='68' x='50' text-anchor='middle' font-size='50'>🚇</text></svg>">
     <title>通勤助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Noto Sans TC', -apple-system, sans-serif; }
-        body { background: #f8f8f6; -webkit-tap-highlight-color: transparent; }
+        @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600;700&display=swap');
 
-        .route-card {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            overflow: hidden;
+        * {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
+        body {
+            background: linear-gradient(180deg, #e8e8ed 0%, #f5f5f7 50%, #e8e8ed 100%);
+            min-height: 100vh;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* iOS 26 液態玻璃卡片 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 22px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow:
+                0 1px 3px rgba(0,0,0,0.04),
+                0 8px 24px rgba(0,0,0,0.08);
+        }
+
+        /* 動態島風格按鈕 */
+        .pill-btn {
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(10px);
+            border-radius: 50px;
+            color: white;
+            transition: all 0.2s ease;
+        }
+        .pill-btn:active {
+            transform: scale(0.97);
+            background: rgba(0, 0, 0, 0.85);
+        }
+
+        /* 標籤樣式 */
+        .tag-rent {
+            background: rgba(59, 130, 246, 0.15);
+            color: #2563eb;
+            border-radius: 8px;
+        }
+        .tag-return {
+            background: rgba(16, 185, 129, 0.15);
+            color: #059669;
+            border-radius: 8px;
+        }
+
+        /* 數量顏色 */
+        .qty-good { color: #059669; }
+        .qty-warn { color: #f59e0b; }
+        .qty-bad { color: #ef4444; }
+
+        /* 展開動畫 */
         .expandable {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.4s ease-out;
+            transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .expandable.open {
-            max-height: 800px;
-            overflow: visible;
-        }
+        .expandable.open { max-height: 800px; }
 
-        .num { font-variant-numeric: tabular-nums; }
-        .tag-rent { background: #dbeafe; color: #1d4ed8; }
-        .tag-return { background: #d1fae5; color: #047857; }
-        .qty-good { color: #059669; }
-        .qty-warn { color: #d97706; }
-        .qty-bad { color: #dc2626; }
-
+        /* 載入動畫 */
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinning { animation: spin 1s linear infinite; }
 
-        .urgent-pulse { animation: urgentBg 1.5s ease-in-out infinite; }
-        @keyframes urgentBg {
-            0%, 100% { background-color: #fff; }
-            50% { background-color: #fef2f2; }
+        /* 緊急閃爍 */
+        .urgent-pulse {
+            animation: urgentGlow 2s ease-in-out infinite;
+        }
+        @keyframes urgentGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+            50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.3); }
         }
 
-        .offline-tag { background: #fef3c7; color: #92400e; }
-
-        /* 分享按鈕 */
-        .share-btn {
-            padding: 4px 10px;
-            background: #eef2ff;
-            color: #4f46e5;
-            border-radius: 6px;
-            font-size: 12px;
-            transition: all 0.2s;
-        }
-        .share-btn:active { transform: scale(0.95); background: #c7d2fe; }
-
-        /* Toast 通知 */
+        /* Toast */
         .toast {
             position: fixed;
-            bottom: 80px;
+            bottom: 100px;
             left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: #1f2937;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
             color: white;
-            padding: 12px 20px;
-            border-radius: 10px;
-            font-size: 14px;
+            padding: 14px 24px;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 500;
             opacity: 0;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 100;
         }
         .toast.show {
             transform: translateX(-50%) translateY(0);
             opacity: 1;
         }
+
+        /* 分享按鈕 */
+        .share-btn {
+            background: rgba(99, 102, 241, 0.12);
+            color: #6366f1;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* 數字等寬 */
+        .num { font-variant-numeric: tabular-nums; }
+
+        /* 定位結果 */
+        .location-pill {
+            background: rgba(99, 102, 241, 0.12);
+            color: #6366f1;
+            border-radius: 50px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 500;
+        }
     </style>
 </head>
-<body class="min-h-screen pb-10">
+<body class="pb-10">
 
-<div class="max-w-lg mx-auto px-4 pt-6">
+<div class="max-w-lg mx-auto px-4 pt-8">
 
     <!-- 時間 -->
-    <header class="text-center mb-5">
-        <p id="currentTime" class="text-4xl font-light num text-gray-800">--:--</p>
-        <p id="currentDate" class="text-sm text-gray-400 mt-1"></p>
+    <header class="text-center mb-6">
+        <p id="currentTime" class="text-5xl font-light num text-gray-800 tracking-tight">--:--:--</p>
+        <p id="currentDate" class="text-base text-gray-500 mt-2"></p>
     </header>
+
+    <!-- 定位按鈕 -->
+    <div class="mb-5">
+        <button onclick="autoLocate()" id="locateBtn" class="pill-btn w-full py-4 flex items-center justify-center gap-3 text-base font-medium">
+            <svg id="locateIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <span id="locateText">自動定位</span>
+        </button>
+        <div id="locationResult" class="hidden mt-3 text-center">
+            <span id="locationName" class="location-pill"></span>
+        </div>
+    </div>
 
     <!-- 離線提示 -->
     <div id="offlineHint" class="hidden text-center mb-4">
-        <span class="offline-tag text-xs px-3 py-1 rounded-full">⚠ 離線模式</span>
+        <span class="location-pill bg-amber-100 text-amber-700">⚠ 離線模式</span>
         <span id="cacheTime" class="text-xs text-gray-400 ml-2"></span>
     </div>
 
     <!-- 常用路線 -->
-    <div class="space-y-3" id="mainRoutes"></div>
+    <div class="space-y-4" id="mainRoutes"></div>
 
     <!-- 更多路線 -->
-    <div class="mt-4">
-        <button onclick="toggleMore()" class="w-full text-center text-sm text-gray-400 py-2 flex items-center justify-center gap-1">
-            <span id="moreLabel">顯示更多路線</span>
-            <svg id="moreArrow" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="mt-5">
+        <button onclick="toggleMore()" class="w-full text-center text-sm text-gray-400 py-3 flex items-center justify-center gap-2">
+            <span id="moreLabel">更多路線</span>
+            <svg id="moreArrow" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
         </button>
-        <div id="moreRoutes" class="space-y-3 hidden"></div>
+        <div id="moreRoutes" class="space-y-4 hidden mt-2"></div>
     </div>
 
     <!-- 重新整理 -->
-    <div class="mt-6 text-center">
-        <button onclick="refreshData()" class="inline-flex items-center gap-2 px-5 py-2.5 bg-white rounded-full shadow text-gray-600 hover:shadow-md transition">
-            <svg id="refreshIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="mt-8 text-center">
+        <button onclick="refreshData()" class="inline-flex items-center gap-2 px-6 py-3 glass-card text-gray-600 font-medium">
+            <svg id="refreshIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
             重新整理
         </button>
-        <p id="updateTime" class="text-xs text-gray-300 mt-2"></p>
+        <p id="updateTime" class="text-xs text-gray-400 mt-3"></p>
     </div>
 
 </div>
 
-<!-- Toast 通知 -->
 <div id="toast" class="toast"></div>
 
 <script>
 const TDX_CLIENT_ID = 'gychen-2bab6175-02b4-4286';
 const TDX_CLIENT_SECRET = 'b055ec7c-b999-4d4d-9c64-0172518974f6';
-const CACHE_KEY = 'commute_v3';
+const CACHE_KEY = 'commute_v4';
 const METRO_TIME = 10;
 
-// ===== 路線定義 =====
+const LOCATIONS = {
+    school: { name: '學校', lat: 25.04099822064754, lng: 121.42230160324743 },
+    a6: { name: 'A6站', lat: 25.033223516811884, lng: 121.42262992980059 },
+    a8: { name: 'A8站', lat: 25.06053376174861, lng: 121.3707347497086 },
+    dorm: { name: '宿舍', lat: 25.05490831481167, lng: 121.37008743186047 },
+    work: { name: '公司', lat: 25.051970647450528, lng: 121.37421893051638 }
+};
+
+const LOCATION_ROUTES = {
+    school: ['school-work'],
+    dorm: ['dorm-school', 'dorm-work'],
+    work: ['work-school', 'work-dorm'],
+    a6: ['school-work'],
+    a8: ['work-school', 'dorm-school']
+};
+
 const MAIN_ROUTES = [
     {
         id: 'school-work',
         name: '學校 → 公司',
         icon: '🎓', iconTo: '🏢',
         stages: [
-            {
-                label: '① 騎到A6',
-                rent: [{ name: '明志科技大學', short: '明志' }],
-                return: [{ name: '捷運泰山貴和站', short: '泰山貴和' }]
-            },
+            { label: '① 騎到A6', rent: [{ name: '明志科技大學', short: '明志' }], return: [{ name: '捷運泰山貴和站', short: '泰山貴和' }] },
             { type: 'metro', from: 'A6', to: 'A8', dir: '0' },
-            {
-                label: '② 騎到公司',
-                rent: [
-                    { name: '捷運長庚醫院站(A8)', short: 'A8站' },
-                    { name: '捷運長庚醫院站(A8)東側', short: 'A8東側' }
-                ],
-                return: [{ name: '復興三復興南路口', short: '復興三路' }]
-            }
+            { label: '② 騎到公司', rent: [{ name: '捷運長庚醫院站(A8)', short: 'A8' }, { name: '捷運長庚醫院站(A8)東側', short: 'A8東' }], return: [{ name: '復興三復興南路口', short: '復興三路' }] }
         ]
     },
     {
@@ -162,20 +229,9 @@ const MAIN_ROUTES = [
         name: '宿舍 → 學校',
         icon: '🏠', iconTo: '🎓',
         stages: [
-            {
-                label: '① 騎到A8',
-                rent: [{ name: '文興公園', short: '文興公園' }],
-                return: [
-                    { name: '捷運長庚醫院站(A8)', short: 'A8站' },
-                    { name: '捷運長庚醫院站(A8)東側', short: 'A8東側' }
-                ]
-            },
+            { label: '① 騎到A8', rent: [{ name: '文興公園', short: '文興公園' }], return: [{ name: '捷運長庚醫院站(A8)', short: 'A8' }, { name: '捷運長庚醫院站(A8)東側', short: 'A8東' }] },
             { type: 'metro', from: 'A8', to: 'A6', dir: '1' },
-            {
-                label: '② 騎到學校',
-                rent: [{ name: '捷運泰山貴和站', short: '泰山貴和' }],
-                return: [{ name: '明志科技大學', short: '明志' }]
-            }
+            { label: '② 騎到學校', rent: [{ name: '捷運泰山貴和站', short: '泰山貴和' }], return: [{ name: '明志科技大學', short: '明志' }] }
         ]
     },
     {
@@ -183,20 +239,9 @@ const MAIN_ROUTES = [
         name: '公司 → 學校',
         icon: '🏢', iconTo: '🎓',
         stages: [
-            {
-                label: '① 騎到A8',
-                rent: [{ name: '復興三復興南路口', short: '復興三路' }],
-                return: [
-                    { name: '捷運長庚醫院站(A8)', short: 'A8站' },
-                    { name: '捷運長庚醫院站(A8)東側', short: 'A8東側' }
-                ]
-            },
+            { label: '① 騎到A8', rent: [{ name: '復興三復興南路口', short: '復興三路' }], return: [{ name: '捷運長庚醫院站(A8)', short: 'A8' }, { name: '捷運長庚醫院站(A8)東側', short: 'A8東' }] },
             { type: 'metro', from: 'A8', to: 'A6', dir: '1' },
-            {
-                label: '② 騎到學校',
-                rent: [{ name: '捷運泰山貴和站', short: '泰山貴和' }],
-                return: [{ name: '明志科技大學', short: '明志' }]
-            }
+            { label: '② 騎到學校', rent: [{ name: '捷運泰山貴和站', short: '泰山貴和' }], return: [{ name: '明志科技大學', short: '明志' }] }
         ]
     }
 ];
@@ -207,35 +252,21 @@ const MORE_ROUTES = [
         name: '宿舍 → 公司',
         icon: '🏠', iconTo: '🏢',
         bikeOnly: true, bikeTime: 15,
-        stages: [
-            {
-                label: '🚲 直接騎車',
-                rent: [{ name: '文興公園', short: '文興公園' }],
-                return: [{ name: '復興三復興南路口', short: '復興三路' }]
-            }
-        ]
+        stages: [{ label: '🚲 直接騎車', rent: [{ name: '文興公園', short: '文興公園' }], return: [{ name: '復興三復興南路口', short: '復興三路' }] }]
     },
     {
         id: 'work-dorm',
         name: '公司 → 宿舍',
         icon: '🏢', iconTo: '🏠',
         bikeOnly: true, bikeTime: 15,
-        stages: [
-            {
-                label: '🚲 直接騎車',
-                rent: [{ name: '復興三復興南路口', short: '復興三路' }],
-                return: [{ name: '文興公園', short: '文興公園' }]
-            }
-        ]
+        stages: [{ label: '🚲 直接騎車', rent: [{ name: '復興三復興南路口', short: '復興三路' }], return: [{ name: '文興公園', short: '文興公園' }] }]
     }
 ];
 
-let accessToken = null;
-let tokenExpiry = null;
+let accessToken = null, tokenExpiry = null;
 let cache = { metro: null, stations: null, avail: null, time: null };
 let moreVisible = false;
 
-// ===== 初始化 =====
 document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     setInterval(updateClock, 1000);
@@ -247,13 +278,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function updateClock() {
     const now = new Date();
-    document.getElementById('currentTime').textContent =
-        now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-    document.getElementById('currentDate').textContent =
-        now.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric', weekday: 'short' });
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    document.getElementById('currentDate').textContent = now.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 }
 
-// ===== 卡片渲染 =====
 function renderAllCards() {
     document.getElementById('mainRoutes').innerHTML = MAIN_ROUTES.map(r => createCardHTML(r)).join('');
     document.getElementById('moreRoutes').innerHTML = MORE_ROUTES.map(r => createCardHTML(r)).join('');
@@ -261,23 +289,23 @@ function renderAllCards() {
 
 function createCardHTML(route) {
     return `
-        <div class="route-card" id="card-${route.id}">
-            <div class="p-4 cursor-pointer" onclick="toggleCard('${route.id}')">
-                <div class="flex items-center justify-between mb-3">
+        <div class="glass-card" id="card-${route.id}">
+            <div class="p-5 cursor-pointer" onclick="toggleCard('${route.id}')">
+                <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-2">
-                        <span class="text-xl">${route.icon}</span>
-                        <span class="text-gray-300">→</span>
-                        <span class="text-xl">${route.iconTo}</span>
-                        <span class="text-sm font-medium text-gray-700 ml-1">${route.name}</span>
+                        <span class="text-2xl">${route.icon}</span>
+                        <span class="text-gray-300 text-lg">→</span>
+                        <span class="text-2xl">${route.iconTo}</span>
+                        <span class="text-base font-semibold text-gray-800 ml-2">${route.name}</span>
                     </div>
-                    <svg id="arrow-${route.id}" class="w-5 h-5 text-gray-300 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg id="arrow-${route.id}" class="w-5 h-5 text-gray-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </div>
-                <div id="summary-${route.id}" class="text-gray-400 text-sm">載入中...</div>
+                <div id="summary-${route.id}" class="text-gray-500 text-sm">載入中...</div>
             </div>
             <div id="detail-${route.id}" class="expandable">
-                <div class="border-t border-gray-100 p-4" id="detailContent-${route.id}"></div>
+                <div class="border-t border-gray-200/50 p-5" id="detailContent-${route.id}"></div>
             </div>
         </div>
     `;
@@ -286,42 +314,26 @@ function createCardHTML(route) {
 function toggleCard(id) {
     const detail = document.getElementById(`detail-${id}`);
     const arrow = document.getElementById(`arrow-${id}`);
-    const isOpen = detail.classList.toggle('open');
-    arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
+    detail.classList.toggle('open');
+    arrow.style.transform = detail.classList.contains('open') ? 'rotate(180deg)' : '';
 }
 
 function toggleMore() {
     moreVisible = !moreVisible;
     document.getElementById('moreRoutes').classList.toggle('hidden', !moreVisible);
-    document.getElementById('moreLabel').textContent = moreVisible ? '收起更多路線' : '顯示更多路線';
+    document.getElementById('moreLabel').textContent = moreVisible ? '收起' : '更多路線';
     document.getElementById('moreArrow').style.transform = moreVisible ? 'rotate(180deg)' : '';
 }
 
-// ===== 快取 =====
-function loadCache() {
-    try {
-        const saved = localStorage.getItem(CACHE_KEY);
-        if (saved) cache = JSON.parse(saved);
-    } catch (e) {}
-}
+function loadCache() { try { const s = localStorage.getItem(CACHE_KEY); if (s) cache = JSON.parse(s); } catch(e) {} }
+function saveCache() { try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch(e) {} }
 
-function saveCache() {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
-}
-
-// ===== API =====
 async function getToken() {
     if (accessToken && tokenExpiry && new Date() < tokenExpiry) return accessToken;
     const res = await fetch('https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'client_credentials',
-            client_id: TDX_CLIENT_ID,
-            client_secret: TDX_CLIENT_SECRET
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ grant_type: 'client_credentials', client_id: TDX_CLIENT_ID, client_secret: TDX_CLIENT_SECRET })
     });
-    if (!res.ok) throw new Error('認證失敗');
     const data = await res.json();
     accessToken = data.access_token;
     tokenExpiry = new Date(Date.now() + (data.expires_in - 300) * 1000);
@@ -335,7 +347,6 @@ async function fetchAPI(token, url) {
 
 async function refreshData() {
     document.getElementById('refreshIcon').classList.add('spinning');
-
     try {
         const token = await getToken();
         const [metro, ntS, tyS, ntA, tyA] = await Promise.all([
@@ -350,13 +361,11 @@ async function refreshData() {
         document.getElementById('offlineHint').classList.add('hidden');
         document.getElementById('updateTime').textContent = `更新於 ${formatTime(new Date())}`;
     } catch (e) {
-        console.error(e);
         if (cache.time) {
             document.getElementById('offlineHint').classList.remove('hidden');
             document.getElementById('cacheTime').textContent = `(${formatTimeAgo(cache.time)})`;
         }
     }
-
     updateAllRoutes();
     document.getElementById('refreshIcon').classList.remove('spinning');
 }
@@ -366,24 +375,19 @@ function updateAllRoutes() {
     [...MAIN_ROUTES, ...MORE_ROUTES].forEach(route => updateRouteDisplay(route));
 }
 
-// ===== 資料處理 =====
 function getNextTrains(from, to, dir, limit = 5) {
     const now = new Date();
     const currentMins = now.getHours() * 60 + now.getMinutes();
-    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-    const serviceTag = isWeekend ? '假日' : '平日';
+    const serviceTag = (now.getDay() === 0 || now.getDay() === 6) ? '假日' : '平日';
 
     const stationData = cache.metro.filter(item =>
-        item.StationID === from &&
-        String(item.Direction) === dir &&
-        item.ServiceDay?.ServiceTag === serviceTag
+        item.StationID === from && String(item.Direction) === dir && item.ServiceDay?.ServiceTag === serviceTag
     );
 
     const trains = [];
     stationData.forEach(route => {
         const dest = route.DestinationStationName?.Zh_tw || '';
         const isExpress = dest === '臺北車站' || dest === 'A1';
-
         route.Timetables.forEach(tt => {
             const [h, m] = tt.DepartureTime.split(':').map(Number);
             let mins = h * 60 + m;
@@ -394,24 +398,18 @@ function getNextTrains(from, to, dir, limit = 5) {
 
     trains.sort((a, b) => a.mins - b.mins);
     const needFilter = (from === 'A6' || to === 'A6');
-    const filtered = needFilter ? trains.filter(t => !t.isExpress) : trains;
-    return filtered.filter(t => t.mins >= currentMins).slice(0, limit);
+    return (needFilter ? trains.filter(t => !t.isExpress) : trains).filter(t => t.mins >= currentMins).slice(0, limit);
 }
 
-function getBikeValue(stationName, type) {
-    const station = cache.stations?.find(s => s.StationName?.Zh_tw?.includes(stationName));
+function getBikeValue(name, type) {
+    const station = cache.stations?.find(s => s.StationName?.Zh_tw?.includes(name));
     if (!station) return null;
     const avail = cache.avail?.find(a => a.StationUID === station.StationUID);
     return type === 'rent' ? (avail?.AvailableRentBikes ?? 0) : (avail?.AvailableReturnBikes ?? 0);
 }
 
-function qtyClass(n) {
-    if (n === 0) return 'qty-bad';
-    if (n <= 3) return 'qty-warn';
-    return 'qty-good';
-}
+function qtyClass(n) { return n === 0 ? 'qty-bad' : n <= 3 ? 'qty-warn' : 'qty-good'; }
 
-// ===== 顯示更新 =====
 function updateRouteDisplay(route) {
     const now = new Date();
     const currentMins = now.getHours() * 60 + now.getMinutes();
@@ -425,238 +423,179 @@ function updateRouteDisplay(route) {
 
     if (metroStage) {
         const trains = getNextTrains(metroStage.from, metroStage.to, metroStage.dir);
-        if (trains.length > 0) {
-            nextTrain = trains[0];
-            countdown = nextTrain.mins - currentMins;
-        }
+        if (trains.length > 0) { nextTrain = trains[0]; countdown = nextTrain.mins - currentMins; }
     }
 
     const bikeStages = route.stages.filter(s => !s.type);
-
-    // ===== 摘要 =====
     let summaryHTML = '';
 
     if (route.bikeOnly) {
         const stage = bikeStages[0];
         const rentVal = getBikeValue(stage.rent[0].name, 'rent') ?? 0;
         const retVal = getBikeValue(stage.return[0].name, 'return') ?? 0;
-
         summaryHTML = `
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-1">
-                        <span class="tag-rent text-xs px-2 py-0.5 rounded">借</span>
-                        <span class="text-base font-bold num ${qtyClass(rentVal)}">${rentVal}</span>
-                        <span class="text-xs text-gray-400">${stage.rent[0].short}</span>
-                    </div>
+                    <span class="tag-rent text-xs px-2 py-1 font-medium">借 <span class="${qtyClass(rentVal)} font-bold">${rentVal}</span> ${stage.rent[0].short}</span>
                     <span class="text-gray-300">→</span>
-                    <div class="flex items-center gap-1">
-                        <span class="tag-return text-xs px-2 py-0.5 rounded">還</span>
-                        <span class="text-base font-bold num ${qtyClass(retVal)}">${retVal}</span>
-                        <span class="text-xs text-gray-400">${stage.return[0].short}</span>
-                    </div>
+                    <span class="tag-return text-xs px-2 py-1 font-medium">還 <span class="${qtyClass(retVal)} font-bold">${retVal}</span> ${stage.return[0].short}</span>
                 </div>
-                <span class="text-sm text-gray-400">🚲 ${route.bikeTime}分</span>
+                <span class="text-gray-400 text-sm">🚲 ${route.bikeTime}分</span>
             </div>
         `;
     } else {
         const isUrgent = countdown !== null && countdown <= 3;
-        if (isUrgent) {
-            cardEl.classList.add('urgent-pulse');
-            triggerVibration();
-        } else {
-            cardEl.classList.remove('urgent-pulse');
-        }
+        if (isUrgent) { cardEl.classList.add('urgent-pulse'); triggerVibration(); }
+        else { cardEl.classList.remove('urgent-pulse'); }
 
-        // 各階段摘要 - 分開顯示每個站點
-        const stagesSummary = bikeStages.map((stage, idx) => {
-            const stageNum = idx === 0 ? '①' : '②';
-
-            // 借車站點（分開顯示）
+        const stageLines = bikeStages.map((stage, idx) => {
+            const num = idx === 0 ? '①' : '②';
             const rentItems = stage.rent.map(s => {
                 const val = getBikeValue(s.name, 'rent') ?? 0;
-                return `<span class="tag-rent text-xs px-1 py-0.5 rounded" title="${s.short}">${s.short.replace('站','')}<b class="${qtyClass(val)}">${val}</b></span>`;
-            }).join('');
-
-            // 還車站點（通常只有一個，顯示合計）
+                return `<span class="${qtyClass(val)} font-bold">${val}</span> ${s.short}`;
+            }).join(' <span class="text-gray-300">/</span> ');
             const retTotal = stage.return.reduce((sum, s) => sum + (getBikeValue(s.name, 'return') ?? 0), 0);
 
             return `
-                <div class="flex items-center gap-1 flex-wrap">
-                    <span class="text-xs text-gray-400">${stageNum}</span>
-                    ${rentItems}
-                    <span class="text-gray-300 text-xs">→</span>
-                    <span class="tag-return text-xs px-1.5 py-0.5 rounded">${retTotal}</span>
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="text-gray-400">${num}</span>
+                    <span class="tag-rent text-xs px-2 py-1">借</span>
+                    <span>${rentItems}</span>
+                    <span class="text-gray-300">→</span>
+                    <span class="tag-return text-xs px-2 py-1">還</span>
+                    <span class="${qtyClass(retTotal)} font-bold">${retTotal}</span>
                 </div>
             `;
-        }).join('<span class="text-gray-200 mx-0.5">|</span>');
+        }).join('');
 
         summaryHTML = `
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">${stagesSummary}</div>
-                <div class="text-right">
+            <div class="flex justify-between items-end gap-4">
+                <div class="space-y-2">${stageLines}</div>
+                <div class="text-right shrink-0">
                     ${nextTrain ? `
-                        <span class="text-lg font-bold num ${isUrgent ? 'text-red-500' : 'text-gray-800'}">${nextTrain.time}</span>
-                        <span class="text-sm ${isUrgent ? 'text-red-400' : 'text-gray-400'} ml-1">${countdown}分</span>
-                    ` : '<span class="text-sm text-gray-400">無班次</span>'}
+                        <div class="text-2xl font-semibold num ${isUrgent ? 'text-red-500' : 'text-gray-800'}">${nextTrain.time}</div>
+                        <div class="text-sm ${isUrgent ? 'text-red-400' : 'text-gray-400'}">${countdown}分後</div>
+                    ` : '<div class="text-sm text-gray-400">無班次</div>'}
                 </div>
             </div>
         `;
     }
-
     summaryEl.innerHTML = summaryHTML;
 
-    // ===== 詳細內容 =====
+    // Detail content
     let detailHTML = '';
-
-    // 捷運班次（含分享按鈕）
     if (metroStage) {
         const trains = getNextTrains(metroStage.from, metroStage.to, metroStage.dir, 5);
-        const arriveStation = metroStage.to;
-
         detailHTML += `
-            <div class="mb-4">
-                <div class="text-xs font-medium text-gray-500 mb-2">🚇 捷運 ${metroStage.from} → ${metroStage.to}</div>
-                ${trains.length > 0 ? `
-                    <div class="space-y-1">
-                        ${trains.map((t, i) => {
-                            const diff = t.mins - currentMins;
-                            const arriveTime = formatMinsToTime(t.mins + METRO_TIME);
-                            const shareData = encodeURIComponent(JSON.stringify({
-                                route: route.name,
-                                from: metroStage.from,
-                                to: metroStage.to,
-                                depart: t.time,
-                                arrive: arriveTime
-                            }));
-                            return `
-                                <div class="flex justify-between items-center py-2 px-2 ${i === 0 ? 'bg-gray-50 rounded' : 'border-b border-gray-50'}">
-                                    <div>
-                                        <span class="num ${i === 0 ? 'font-medium text-base' : 'text-gray-500'}">${t.time}</span>
-                                        <span class="text-xs text-gray-400 ml-2">→ ${arriveTime} 到${arriveStation}</span>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-sm ${diff <= 3 ? 'text-red-500 font-medium' : diff <= 5 ? 'text-amber-500' : 'text-gray-400'}">${diff}分</span>
-                                        <button class="share-btn" onclick="shareTrain('${shareData}')">分享</button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                ` : '<div class="text-gray-400 text-sm">今日已無班次</div>'}
+            <div class="mb-5">
+                <div class="text-xs font-medium text-gray-500 mb-3">🚇 捷運 ${metroStage.from} → ${metroStage.to}</div>
+                ${trains.length > 0 ? `<div class="space-y-2">${trains.map((t, i) => {
+                    const diff = t.mins - currentMins;
+                    const arriveTime = formatMinsToTime(t.mins + METRO_TIME);
+                    const shareData = encodeURIComponent(JSON.stringify({ route: route.name, from: metroStage.from, to: metroStage.to, depart: t.time, arrive: arriveTime }));
+                    return `
+                        <div class="flex justify-between items-center py-2 px-3 ${i === 0 ? 'bg-gray-100/60 rounded-xl' : ''}">
+                            <div>
+                                <span class="num font-medium ${i === 0 ? 'text-lg' : 'text-gray-600'}">${t.time}</span>
+                                <span class="text-gray-400 text-sm ml-2">→ ${arriveTime}</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="${diff <= 3 ? 'text-red-500 font-semibold' : diff <= 5 ? 'text-amber-500' : 'text-gray-400'}">${diff}分</span>
+                                <button class="share-btn" onclick="event.stopPropagation(); shareTrain('${shareData}')">分享</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}</div>` : '<div class="text-gray-400">今日已無班次</div>'}
             </div>
         `;
     }
 
-    // YouBike 各階段詳細
     bikeStages.forEach(stage => {
         detailHTML += `
             <div class="mb-4">
-                <div class="text-xs font-medium text-gray-500 mb-2">${stage.label}</div>
+                <div class="text-xs font-medium text-gray-500 mb-3">${stage.label}</div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <div class="text-xs text-blue-600 font-medium mb-1">借車</div>
+                        <div class="text-xs text-blue-600 font-medium mb-2">借車</div>
                         ${stage.rent.map(s => {
                             const val = getBikeValue(s.name, 'rent') ?? 0;
-                            return `
-                                <div class="bg-blue-50 p-2 rounded mb-1">
-                                    <div class="text-xs text-gray-600">${s.short}</div>
-                                    <div class="text-xl font-bold num ${qtyClass(val)}">${val}</div>
-                                </div>
-                            `;
+                            return `<div class="bg-blue-50 p-3 rounded-xl mb-2"><div class="text-xs text-gray-500">${s.short}</div><div class="text-2xl font-bold num ${qtyClass(val)}">${val}</div></div>`;
                         }).join('')}
                     </div>
                     <div>
-                        <div class="text-xs text-emerald-600 font-medium mb-1">還車</div>
+                        <div class="text-xs text-emerald-600 font-medium mb-2">還車</div>
                         ${stage.return.map(s => {
                             const val = getBikeValue(s.name, 'return') ?? 0;
-                            return `
-                                <div class="bg-emerald-50 p-2 rounded mb-1">
-                                    <div class="text-xs text-gray-600">${s.short}</div>
-                                    <div class="text-xl font-bold num ${qtyClass(val)}">${val}</div>
-                                </div>
-                            `;
+                            return `<div class="bg-emerald-50 p-3 rounded-xl mb-2"><div class="text-xs text-gray-500">${s.short}</div><div class="text-2xl font-bold num ${qtyClass(val)}">${val}</div></div>`;
                         }).join('')}
                     </div>
                 </div>
             </div>
         `;
     });
-
     detailEl.innerHTML = detailHTML;
 }
 
-// ===== 工具 =====
-function formatTime(d) {
-    return d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
-}
+function formatTime(d) { return d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }); }
+function formatMinsToTime(mins) { return `${String(Math.floor(mins/60)%24).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`; }
+function formatTimeAgo(ts) { const m = Math.floor((Date.now()-ts)/60000); return m < 1 ? '剛剛' : m < 60 ? `${m}分鐘前` : `${Math.floor(m/60)}小時前`; }
+function triggerVibration() { if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]); }
 
-function formatMinsToTime(mins) {
-    const h = Math.floor(mins / 60) % 24;
-    const m = mins % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function formatTimeAgo(ts) {
-    const mins = Math.floor((Date.now() - ts) / 60000);
-    if (mins < 1) return '剛剛';
-    if (mins < 60) return `${mins}分鐘前`;
-    return `${Math.floor(mins / 60)}小時前`;
-}
-
-function triggerVibration() {
-    if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
-}
-
-// ===== 分享功能 =====
 async function shareTrain(encodedData) {
     const data = JSON.parse(decodeURIComponent(encodedData));
     const today = new Date().toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' });
+    const text = `🚇 通勤資訊 (${today})\n━━━━━━━━━━\n📍 ${data.route}\n🕐 ${data.depart} 從 ${data.from} 站發車\n🎯 預計 ${data.arrive} 抵達 ${data.to} 站\n━━━━━━━━━━\n有空的話可以來接我～`;
 
-    const text = `🚇 通勤資訊 (${today})
-━━━━━━━━━━
-📍 ${data.route}
-🕐 ${data.depart} 從 ${data.from} 站發車
-🎯 預計 ${data.arrive} 抵達 ${data.to} 站
-━━━━━━━━━━
-有空的話可以來接我～`;
-
-    // 嘗試使用 Web Share API
-    if (navigator.share) {
-        try {
-            await navigator.share({ text });
-            showToast('✓ 已開啟分享');
-            return;
-        } catch (e) {
-            if (e.name !== 'AbortError') {
-                console.log('Share failed, fallback to clipboard');
-            } else {
-                return; // 使用者取消分享
-            }
-        }
-    }
-
-    // Fallback: 複製到剪貼簿
-    try {
-        await navigator.clipboard.writeText(text);
-        showToast('✓ 已複製到剪貼簿');
-    } catch (e) {
-        // 最後手段：選取文字
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showToast('✓ 已複製到剪貼簿');
-    }
+    if (navigator.share) { try { await navigator.share({ text }); return; } catch(e) { if (e.name === 'AbortError') return; } }
+    try { await navigator.clipboard.writeText(text); showToast('✓ 已複製到剪貼簿'); }
+    catch(e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast('✓ 已複製'); }
 }
 
-function showToast(message) {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2000);
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+
+function autoLocate() {
+    const btn = document.getElementById('locateBtn'), text = document.getElementById('locateText'), icon = document.getElementById('locateIcon');
+    if (!navigator.geolocation) { showToast('❌ 不支援定位'); return; }
+    text.textContent = '定位中...'; icon.classList.add('spinning'); btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const nearest = findNearestLocation(pos.coords.latitude, pos.coords.longitude);
+            document.getElementById('locationResult').classList.remove('hidden');
+            document.getElementById('locationName').textContent = `📍 ${nearest.location.name}附近 (${nearest.distance}m)`;
+            highlightRoutes(nearest.key);
+            text.textContent = '重新定位'; icon.classList.remove('spinning'); btn.disabled = false;
+            showToast(`✓ 已定位到${nearest.location.name}`);
+        },
+        (err) => {
+            showToast(`❌ ${err.code === 1 ? '請允許定位' : '定位失敗'}`);
+            text.textContent = '自動定位'; icon.classList.remove('spinning'); btn.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+}
+
+function findNearestLocation(lat, lng) {
+    let nearest = null, minDist = Infinity;
+    for (const [key, loc] of Object.entries(LOCATIONS)) {
+        const d = getDistance(lat, lng, loc.lat, loc.lng);
+        if (d < minDist) { minDist = d; nearest = { key, location: loc, distance: Math.round(d) }; }
+    }
+    return nearest;
+}
+
+function getDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371000, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function highlightRoutes(key) {
+    document.querySelectorAll('.glass-card').forEach(c => c.classList.remove('ring-2', 'ring-indigo-400'));
+    (LOCATION_ROUTES[key] || []).forEach(id => {
+        const card = document.getElementById(`card-${id}`);
+        if (card) { card.classList.add('ring-2', 'ring-indigo-400'); if (MORE_ROUTES.some(r => r.id === id) && !moreVisible) toggleMore(); }
+    });
 }
 </script>
 </body>

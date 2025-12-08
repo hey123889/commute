@@ -136,6 +136,21 @@
 
 <div class="max-w-lg mx-auto px-4 pt-8">
 
+    <!-- 定位結果置頂提示 -->
+    <div id="locationBanner" class="hidden mb-4">
+        <div class="glass-card p-4 flex items-center justify-between bg-indigo-50/80">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">📍</span>
+                <span id="bannerLocation" class="font-medium text-indigo-700"></span>
+            </div>
+            <button onclick="closeBanner()" class="text-indigo-400 hover:text-indigo-600 p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <!-- 時間 -->
     <header class="text-center mb-6">
         <p id="currentTime" class="text-5xl font-light num text-gray-800 tracking-tight">--:--:--</p>
@@ -151,8 +166,31 @@
             </svg>
             <span id="locateText">自動定位</span>
         </button>
-        <div id="locationResult" class="hidden mt-3 text-center">
-            <span id="locationName" class="location-pill"></span>
+    </div>
+
+    <!-- 目標班次 -->
+    <div id="targetBanner" class="hidden mb-4">
+        <div class="glass-card p-4 bg-amber-50/80 border-amber-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🎯</span>
+                    <div>
+                        <div class="text-xs text-amber-600 font-medium">目標班次</div>
+                        <div id="targetInfo" class="font-semibold text-gray-800"></div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <div id="targetCountdown" class="text-2xl font-bold num text-amber-600"></div>
+                        <div class="text-xs text-gray-500">分鐘後</div>
+                    </div>
+                    <button onclick="clearTarget()" class="text-amber-400 hover:text-amber-600 p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -190,6 +228,23 @@
 </div>
 
 <div id="toast" class="toast"></div>
+
+<!-- 頂部緊急提醒 -->
+<div id="urgentAlert" class="fixed top-0 left-0 right-0 z-50 transform -translate-y-full transition-transform duration-300">
+    <div class="max-w-lg mx-auto px-4 pt-2">
+        <div class="bg-red-500/95 backdrop-blur-lg text-white px-5 py-3 rounded-b-2xl shadow-lg flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-lg">🚨</span>
+                <span id="urgentText" class="font-medium"></span>
+            </div>
+            <button onclick="hideUrgentAlert()" class="text-white/80 hover:text-white p-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
 
 <script>
 const TDX_CLIENT_ID = 'gychen-2bab6175-02b4-4286';
@@ -266,11 +321,15 @@ const MORE_ROUTES = [
 let accessToken = null, tokenExpiry = null;
 let cache = { metro: null, stations: null, avail: null, time: null };
 let moreVisible = false;
+let targetTrain = null; // { routeId, time, routeName }
 
 document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     setInterval(updateClock, 1000);
-    setInterval(updateAllRoutes, 1000);
+    setInterval(() => {
+        updateAllRoutes();
+        updateTargetBanner();
+    }, 1000);
     loadCache();
     renderAllCards();
     refreshData();
@@ -292,11 +351,12 @@ function createCardHTML(route) {
         <div class="glass-card" id="card-${route.id}">
             <div class="p-5 cursor-pointer" onclick="toggleCard('${route.id}')">
                 <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center gap-2">
-                        <span class="text-2xl">${route.icon}</span>
-                        <span class="text-gray-300 text-lg">→</span>
-                        <span class="text-2xl">${route.iconTo}</span>
-                        <span class="text-base font-semibold text-gray-800 ml-2">${route.name}</span>
+                    <div class="flex items-center gap-1.5 text-base">
+                        <span class="font-semibold text-gray-800">${route.name.split(' → ')[0]}</span>
+                        <span class="text-xl">${route.icon}</span>
+                        <span class="text-gray-300 mx-1">→</span>
+                        <span class="font-semibold text-gray-800">${route.name.split(' → ')[1]}</span>
+                        <span class="text-xl">${route.iconTo}</span>
                     </div>
                     <svg id="arrow-${route.id}" class="w-5 h-5 text-gray-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -444,9 +504,22 @@ function updateRouteDisplay(route) {
             </div>
         `;
     } else {
-        const isUrgent = countdown !== null && countdown <= 3;
-        if (isUrgent) { cardEl.classList.add('urgent-pulse'); triggerVibration(); }
-        else { cardEl.classList.remove('urgent-pulse'); }
+        // 只有「設定的目標班次」才觸發緊急提醒（不是該路線的第一班車）
+        let targetCountdown = null;
+        if (targetTrain && targetTrain.routeId === route.id) {
+            const [h, m] = targetTrain.time.split(':').map(Number);
+            let targetMins = h * 60 + m;
+            if (targetMins < currentMins - 180) targetMins += 1440;
+            targetCountdown = targetMins - currentMins;
+        }
+        const isUrgent = targetCountdown !== null && targetCountdown <= 3 && targetCountdown >= 0;
+        if (isUrgent) {
+            cardEl.classList.add('urgent-pulse');
+            triggerVibration();
+            showUrgentAlert(route.name, targetCountdown);
+        } else {
+            cardEl.classList.remove('urgent-pulse');
+        }
 
         const stageLines = bikeStages.map((stage, idx) => {
             const num = idx === 0 ? '①' : '②';
@@ -493,14 +566,17 @@ function updateRouteDisplay(route) {
                     const diff = t.mins - currentMins;
                     const arriveTime = formatMinsToTime(t.mins + METRO_TIME);
                     const shareData = encodeURIComponent(JSON.stringify({ route: route.name, from: metroStage.from, to: metroStage.to, depart: t.time, arrive: arriveTime }));
+                    const isTarget = targetTrain && targetTrain.routeId === route.id && targetTrain.time === t.time;
                     return `
-                        <div class="flex justify-between items-center py-2 px-3 ${i === 0 ? 'bg-gray-100/60 rounded-xl' : ''}">
+                        <div class="flex justify-between items-center py-2 px-3 rounded-xl ${isTarget ? 'bg-amber-100/80 ring-2 ring-amber-400' : i === 0 ? 'bg-gray-100/60' : ''}">
                             <div>
                                 <span class="num font-medium ${i === 0 ? 'text-lg' : 'text-gray-600'}">${t.time}</span>
                                 <span class="text-gray-400 text-sm ml-2">→ ${arriveTime}</span>
+                                ${isTarget ? '<span class="ml-2 text-amber-600 text-xs">🎯 目標</span>' : ''}
                             </div>
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2">
                                 <span class="${diff <= 3 ? 'text-red-500 font-semibold' : diff <= 5 ? 'text-amber-500' : 'text-gray-400'}">${diff}分</span>
+                                ${isTarget ? '' : `<button class="text-xs px-2 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium" onclick="event.stopPropagation(); setTarget('${route.id}', '${t.time}', '${route.name}', ${t.mins})">設為目標</button>`}
                                 <button class="share-btn" onclick="event.stopPropagation(); shareTrain('${shareData}')">分享</button>
                             </div>
                         </div>
@@ -553,26 +629,101 @@ async function shareTrain(encodedData) {
 
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
 
+function closeBanner() { document.getElementById('locationBanner').classList.add('hidden'); }
+
+let urgentAlertShown = {};
+function showUrgentAlert(routeName, countdown) {
+    const key = `${routeName}-${countdown}`;
+    if (urgentAlertShown[key]) return;
+    urgentAlertShown[key] = true;
+    const el = document.getElementById('urgentAlert');
+    document.getElementById('urgentText').textContent = `${routeName} ${countdown}分鐘後發車！`;
+    el.classList.remove('-translate-y-full');
+    setTimeout(() => el.classList.add('-translate-y-full'), 8000);
+}
+function hideUrgentAlert() { document.getElementById('urgentAlert').classList.add('-translate-y-full'); }
+
+function setTarget(routeId, time, routeName, mins) {
+    targetTrain = { routeId, time, routeName, mins };
+    document.getElementById('targetBanner').classList.remove('hidden');
+    document.getElementById('targetInfo').textContent = `${routeName} ${time} 發車`;
+    updateTargetBanner();
+    updateAllRoutes(); // 重新渲染以顯示目標標記
+    showToast('✓ 已設定目標班次');
+}
+
+function clearTarget() {
+    targetTrain = null;
+    document.getElementById('targetBanner').classList.add('hidden');
+    updateAllRoutes();
+    showToast('已取消目標');
+}
+
+function updateTargetBanner() {
+    if (!targetTrain) return;
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    let mins = targetTrain.mins;
+    // 處理跨日
+    if (mins < currentMins - 180) mins += 1440;
+    const diff = mins - currentMins;
+
+    if (diff < 0) {
+        // 班次已過
+        clearTarget();
+        showToast('⚠ 目標班次已過');
+        return;
+    }
+
+    document.getElementById('targetCountdown').textContent = diff;
+
+    // 根據剩餘時間改變顏色
+    const banner = document.getElementById('targetBanner').querySelector('.glass-card');
+    const countdown = document.getElementById('targetCountdown');
+    if (diff <= 3) {
+        countdown.classList.remove('text-amber-600');
+        countdown.classList.add('text-red-500');
+    } else {
+        countdown.classList.remove('text-red-500');
+        countdown.classList.add('text-amber-600');
+    }
+}
+
 function autoLocate() {
     const btn = document.getElementById('locateBtn'), text = document.getElementById('locateText'), icon = document.getElementById('locateIcon');
     if (!navigator.geolocation) { showToast('❌ 不支援定位'); return; }
     text.textContent = '定位中...'; icon.classList.add('spinning'); btn.disabled = true;
 
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const nearest = findNearestLocation(pos.coords.latitude, pos.coords.longitude);
-            document.getElementById('locationResult').classList.remove('hidden');
-            document.getElementById('locationName').textContent = `📍 ${nearest.location.name}附近 (${nearest.distance}m)`;
-            highlightRoutes(nearest.key);
-            text.textContent = '重新定位'; icon.classList.remove('spinning'); btn.disabled = false;
-            showToast(`✓ 已定位到${nearest.location.name}`);
-        },
-        (err) => {
-            showToast(`❌ ${err.code === 1 ? '請允許定位' : '定位失敗'}`);
-            text.textContent = '自動定位'; icon.classList.remove('spinning'); btn.disabled = false;
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
+    const onSuccess = (pos) => {
+        const nearest = findNearestLocation(pos.coords.latitude, pos.coords.longitude);
+        // 顯示置頂 banner
+        document.getElementById('locationBanner').classList.remove('hidden');
+        document.getElementById('bannerLocation').textContent = `在${nearest.location.name}附近 (${nearest.distance}m)，推薦路線`;
+        // 捲動到頂部
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        highlightRoutes(nearest.key);
+        text.textContent = '重新定位'; icon.classList.remove('spinning'); btn.disabled = false;
+    };
+
+    const onError = (err) => {
+        let msg = '定位失敗';
+        if (err.code === 1) msg = '請允許定位權限';
+        else if (err.code === 2) msg = '無法取得位置';
+        else if (err.code === 3) msg = '定位逾時';
+        showToast(`❌ ${msg}`);
+        text.textContent = '自動定位'; icon.classList.remove('spinning'); btn.disabled = false;
+    };
+
+    // 先嘗試快速定位，失敗再用高精度
+    navigator.geolocation.getCurrentPosition(onSuccess, (err) => {
+        if (err.code === 3) {
+            // 逾時，嘗試低精度
+            navigator.geolocation.getCurrentPosition(onSuccess, onError,
+                { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+        } else {
+            onError(err);
+        }
+    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
 }
 
 function findNearestLocation(lat, lng) {
